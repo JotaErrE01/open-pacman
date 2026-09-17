@@ -119,6 +119,16 @@ function ghostTarget( game, g ) {
     const d = DIRS[ p.dir ] || { x: 0, y: 0 };
     return { x: px + 4 * d.x, y: py + 4 * d.y };
   }
+  if ( g.kind === 'erratic' ) {
+    const d = DIRS[ p.dir ] || { x: 0, y: 0 };
+    const pivot = { x: px + 2 * d.x, y: py + 2 * d.y };
+    const ref = game.ghosts.find(
+      ( o ) => o !== g && ( o.kind === 'aggressive' || o.kind === 'hunter' )
+    );
+    const rx = ref ? ref.x : px;
+    const ry = ref ? ref.y : py;
+    return { x: 2 * pivot.x - rx, y: 2 * pivot.y - ry };
+  }
   if ( g.kind === 'shy' ) {
     const dist = Math.abs( g.x - px ) + Math.abs( g.y - py );
     if ( dist > 8 ) return { x: px, y: py };
