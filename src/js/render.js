@@ -144,7 +144,14 @@ function drawHUD( ctx, game, W ) {
   ctx.fillText( 'VIDAS ' + game.lives, W * TILE - 8, 4 );
 }
 
-const GHOST_COLORS = [ '#ff0000', '#00ffff', '#ffb8ff', '#ffb852' ];
+// Color fijo por rol para distinguir comportamientos de un vistazo.
+const GHOST_COLORS_BY_KIND = {
+  aggressive: '#ff0000',
+  ambusher: '#ffb8ff',
+  erratic: '#00ffff',
+  shy: '#ffb852',
+};
+const GHOST_COLORS_FALLBACK = [ '#ff0000', '#00ffff', '#ffb8ff', '#ffb852' ];
 
 function draw( ctx, game, frame ) {
   const grid = game.grid;
@@ -158,7 +165,8 @@ function draw( ctx, game, frame ) {
   drawDoor( ctx, grid );
   drawDots( ctx, grid );
   drawPacman( ctx, game.pacman, frame );
-  game.ghosts.forEach( ( g, i ) => drawGhost( ctx, g, GHOST_COLORS[ i ] || '#ff0000' ) );
+  game.ghosts.forEach( ( g, i ) =>
+    drawGhost( ctx, g, GHOST_COLORS_BY_KIND[ g.kind ] || GHOST_COLORS_FALLBACK[ i ] || '#ff0000' ) );
   drawHUD( ctx, game, W );
 }
 

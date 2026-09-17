@@ -110,9 +110,35 @@ function movePacman( game ) {
   wrapTunnel( p, width );
 }
 
+// Celda objetivo que persigue cada fantasma (origen arriba-izquierda).
+function ghostTarget( game, g ) {
+  const p = game.pacman;
+  const px = Math.round( p.x );
+  const py = Math.round( p.y );
+  if ( g.kind === 'ambusher' ) {
+    const d = DIRS[ p.dir ] || { x: 0, y: 0 };
+    return { x: px + 4 * d.x, y: py + 4 * d.y };
+  }
+  if ( g.kind === 'erratic' ) {
+    const d = DIRS[ p.dir ] || { x: 0, y: 0 };
+    const pivot = { x: px + 2 * d.x, y: py + 2 * d.y };
+    const ref = game.ghosts.find(
+      ( o ) => o !== g && ( o.kind === 'aggressive' || o.kind === 'hunter' )
+    );
+    const rx = ref ? ref.x : px;
+    const ry = ref ? ref.y : py;
+    return { x: 2 * pivot.x - rx, y: 2 * pivot.y - ry };
+  }
+  if ( g.kind === 'shy' ) {
+    const dist = Math.abs( g.x - px ) + Math.abs( g.y - py );
+    if ( dist > 8 ) return { x: px, y: py };
+    return { x: 1, y: 29 };
+  }
+  return { x: px, y: py };
+}
+
 function decideGhost( game, g ) {
   const grid = game.grid;
-  const p = game.pacman;
 
   const options = Object.keys( DIRS ).filter(
     ( dir ) => dir !== OPPOSITE[ g.dir ] && canMove( grid, g.x, g.y, dir, 'ghost' )
@@ -120,16 +146,16 @@ function decideGhost( game, g ) {
   // Sin salida (callejon): permitir el giro de 180.
   const choices = options.length ? options : [ '' + OPPOSITE[ g.dir ] ];
 
-  if ( g.kind === 'hunter' ) {
-    const px = Math.round( p.x );
-    const py = Math.round( p.y );
+  if ( g.kind === 'aggressive' || g.kind === 'hunter' ||
+    g.kind === 'ambusher' || g.kind === 'erratic' || g.kind === 'shy' ) {
+    const t = ghostTarget( game, g );
     let best = choices[ 0 ];
     let bestDist = Infinity;
     for ( const dir of choices ) {
       const d = DIRS[ dir ];
       const nx = g.x + d.x;
       const ny = g.y + d.y;
-      const dist = Math.abs( nx - px ) + Math.abs( ny - py );
+      const dist = Math.abs( nx - t.x ) + Math.abs( ny - t.y );
       if ( dist < bestDist ) {
         bestDist = dist;
         best = dir;
