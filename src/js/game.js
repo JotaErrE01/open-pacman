@@ -111,11 +111,20 @@ function movePacman( game ) {
 }
 
 // Celda objetivo que persigue cada fantasma (origen arriba-izquierda).
-// Paso 2: solo `aggressive` (Pac-Man redondeado); el resto cae al mismo
-// objetivo hasta que los pasos 3-4 les den su targeting propio.
 function ghostTarget( game, g ) {
   const p = game.pacman;
-  return { x: Math.round( p.x ), y: Math.round( p.y ) };
+  const px = Math.round( p.x );
+  const py = Math.round( p.y );
+  if ( g.kind === 'ambusher' ) {
+    const d = DIRS[ p.dir ] || { x: 0, y: 0 };
+    return { x: px + 4 * d.x, y: py + 4 * d.y };
+  }
+  if ( g.kind === 'shy' ) {
+    const dist = Math.abs( g.x - px ) + Math.abs( g.y - py );
+    if ( dist > 8 ) return { x: px, y: py };
+    return { x: 1, y: 29 };
+  }
+  return { x: px, y: py };
 }
 
 function decideGhost( game, g ) {
