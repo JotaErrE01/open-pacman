@@ -36,12 +36,14 @@ function createGame() {
       nextDir: null,
       speed: PACMAN_SPEED,
     },
-    ghosts: GHOST_STARTS.map( ( g ) => ( {
+    ghosts: GHOST_STARTS.map( ( g, i ) => ( {
       x: g.x,
       y: g.y,
       dir: 'up',
       speed: GHOST_SPEED,
       kind: g.kind,
+      mode: 'pen',
+      exitTimer: [ 0, 120, 240, 360 ][ i ],
     } ) ),
   };
 }
@@ -52,25 +54,38 @@ function aligned( v ) {
 
 // Una celda es muro para el actor dado?
 //   pacman: bloqueado por pared (1) y puerta (3)
-//   ghost:  bloqueado solo por pared (1)
-function isWall( grid, x, y, actor ) {
+//   ghost 'outside'/'pen': bloqueado por pared (1) y puerta (3)
+//   ghost 'leaving': bloqueado solo por pared (1) — puede cruzar la puerta
+function isWall( grid, x, y, actor, mode ) {
+  if ( actor && typeof actor === 'object' ) {
+    mode = actor.mode;
+    actor = 'ghost';
+  }
   if ( y < 0 || y >= grid.length ) return true;
   if ( x < 0 || x >= grid[ 0 ].length ) return true;
   const v = grid[ y ][ x ];
   if ( v === 1 ) return true;
-  if ( v === 3 && actor === 'pacman' ) return true;
+  if ( v === 3 ) {
+    if ( actor === 'pacman' ) return true;
+    if ( actor === 'ghost' ) return mode !== 'leaving';
+    return true;
+  }
   return false;
 }
 
 // Puede el actor avanzar desde (x,y) en la direccion dir?
-function canMove( grid, x, y, dir, actor ) {
+function canMove( grid, x, y, dir, actor, mode ) {
+  if ( actor && typeof actor === 'object' ) {
+    mode = actor.mode;
+    actor = 'ghost';
+  }
   const d = DIRS[ dir ];
   if ( !d ) return false;
   const tx = x + d.x;
   const ty = y + d.y;
   // Tunel: salir por un borde en la fila del tunel siempre es valido.
   if ( ty === TUNNEL_ROW && ( tx < 0 || tx >= grid[ 0 ].length ) ) return true;
-  return !isWall( grid, tx, ty, actor );
+  return !isWall( grid, tx, ty, actor, mode );
 }
 
 function wrapTunnel( a, width ) {
@@ -141,7 +156,7 @@ function decideGhost( game, g ) {
   const grid = game.grid;
 
   const options = Object.keys( DIRS ).filter(
-    ( dir ) => dir !== OPPOSITE[ g.dir ] && canMove( grid, g.x, g.y, dir, 'ghost' )
+    ( dir ) => dir !== OPPOSITE[ g.dir ] && canMove( grid, g.x, g.y, dir, g )
   );
   // Sin salida (callejon): permitir el giro de 180.
   const choices = options.length ? options : [ '' + OPPOSITE[ g.dir ] ];
@@ -171,11 +186,63 @@ function moveGhost( game, g ) {
   const grid = game.grid;
   const width = grid[ 0 ].length;
 
+  // Corral: balanceo vertical hasta agotar exitTimer.
+  if ( g.mode === 'pen' ) {
+    if ( g.exitTimer > 0 ) g.exitTimer--;
+    if ( g.exitTimer <= 0 ) {
+      g.mode = 'leaving';
+    } else {
+      if ( g.dir !== 'up' && g.dir !== 'down' ) g.dir = 'up';
+      if ( aligned( g.x ) && aligned( g.y ) ) {
+        g.x = Math.round( g.x );
+        g.y = Math.round( g.y );
+        if ( !canMove( grid, g.x, g.y, g.dir, g ) ) {
+          g.dir = g.dir === 'up' ? 'down' : 'up';
+        }
+        if ( !canMove( grid, g.x, g.y, g.dir, g ) ) return;
+      }
+      const d = DIRS[ g.dir ];
+      g.x += d.x * g.speed;
+      g.y += d.y * g.speed;
+      wrapTunnel( g, width );
+      return;
+    }
+  }
+
+  // Saliendo: centrar en x=13|14 y subir a y=11.
+  if ( g.mode === 'leaving' ) {
+    if ( aligned( g.x ) && aligned( g.y ) ) {
+      g.x = Math.round( g.x );
+      g.y = Math.round( g.y );
+      if ( g.y <= 11 ) {
+        g.mode = 'outside';
+      } else {
+        if ( g.x < 13 ) g.dir = 'right';
+        else if ( g.x > 14 ) g.dir = 'left';
+        else g.dir = 'up';
+        if ( !canMove( grid, g.x, g.y, g.dir, g ) ) return;
+      }
+    }
+    if ( g.mode === 'leaving' ) {
+      const d = DIRS[ g.dir ];
+      g.x += d.x * g.speed;
+      g.y += d.y * g.speed;
+      wrapTunnel( g, width );
+      // Llego a la salida al alinearse; el cambio a 'outside' se hace arriba.
+      if ( aligned( g.x ) && aligned( g.y ) ) {
+        g.x = Math.round( g.x );
+        g.y = Math.round( g.y );
+        if ( g.y <= 11 ) g.mode = 'outside';
+      }
+      return;
+    }
+  }
+
   if ( aligned( g.x ) && aligned( g.y ) ) {
     g.x = Math.round( g.x );
     g.y = Math.round( g.y );
     decideGhost( game, g );
-    if ( !canMove( grid, g.x, g.y, g.dir, 'ghost' ) ) return;
+    if ( !canMove( grid, g.x, g.y, g.dir, g ) ) return;
   }
 
   const d = DIRS[ g.dir ];
@@ -194,6 +261,8 @@ function resetPositions( game ) {
     g.x = GHOST_STARTS[ i ].x;
     g.y = GHOST_STARTS[ i ].y;
     g.dir = 'up';
+    g.mode = 'pen';
+    g.exitTimer = [ 0, 120, 240, 360 ][ i ];
   } );
 }
 
