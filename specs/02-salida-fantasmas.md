@@ -1,6 +1,6 @@
 # SPEC 02 — Salida escalonada de fantasmas sin re-entrada
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** SPEC 01
 > **Date:** 2026-09-18
 > **Objective:** Los 4 fantasmas salen del corral de forma escalonada y no vuelven a entrar por la puerta.

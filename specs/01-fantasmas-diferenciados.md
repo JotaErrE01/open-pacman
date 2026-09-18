@@ -1,6 +1,6 @@
 # SPEC 01 — Cuatro fantasmas con personalidades clásicas diferenciadas
 
-> **Status:** Approved
+> **Status:** Implemented
 > **Depends on:** Ninguna
 > **Date:** 2026-09-17
 > **Objective:** Dotar al juego de 4 fantasmas con comportamientos distintos de estilo arcade clásico, incluyendo uno agresivo que persigue directamente a Pac-Man.
