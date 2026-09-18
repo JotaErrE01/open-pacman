@@ -12,6 +12,9 @@ const OPPOSITE = { left: 'right', right: 'left', up: 'down', down: 'up' };
 
 const PACMAN_SPEED = 0.125; // 1/8 celda/frame -> alinea cada 8 frames
 const GHOST_SPEED = 0.1;    // 1/10 celda/frame
+const FRIGHT_DURATION = 420; // ~7s a 60fps
+const FRIGHT_SPEED = 0.05;   // 1/20 celda/frame -> alinea cada 20 frames
+const FRIGHT_WARNING = 120;  // ultimos frames en blanco parpadeante
 
 // Crea una partida nueva. Copia MAZE (pristino) a game.grid para poder comer
 // dots sin destruir el original, y reiniciar.
@@ -21,13 +24,15 @@ function createGame() {
   grid[ PACMAN_START.y ][ PACMAN_START.x ] = 0;
 
   let dots = 0;
-  for ( const row of grid ) for ( const v of row ) if ( v === 2 ) dots++;
+  for ( const row of grid ) for ( const v of row ) if ( v === 2 || v === 4 ) dots++;
 
   return {
     state: 'start',
     score: 0,
     lives: 3,
     dotsRemaining: dots,
+    frightTimer: 0,
+    ghostChain: 0,
     grid,
     pacman: {
       x: PACMAN_START.x,
@@ -115,6 +120,14 @@ function movePacman( game ) {
       game.score += 10;
       game.dotsRemaining--;
     }
+    // Comer power pellet: 50 pts y activa/reinicia frightened.
+    if ( grid[ p.y ][ p.x ] === 4 ) {
+      grid[ p.y ][ p.x ] = 0;
+      game.score += 50;
+      game.dotsRemaining--;
+      game.frightTimer = FRIGHT_DURATION;
+      game.ghostChain = 0;
+    }
     // Si no puede seguir, se detiene en la celda.
     if ( !canMove( grid, p.x, p.y, p.dir, 'pacman' ) ) return;
   }
@@ -160,6 +173,12 @@ function decideGhost( game, g ) {
   );
   // Sin salida (callejon): permitir el giro de 180.
   const choices = options.length ? options : [ '' + OPPOSITE[ g.dir ] ];
+
+  // Frightened: deambular aleatorio.
+  if ( game.frightTimer > 0 ) {
+    g.dir = choices[ Math.floor( Math.random() * choices.length ) ];
+    return;
+  }
 
   if ( g.kind === 'aggressive' || g.kind === 'hunter' ||
     g.kind === 'ambusher' || g.kind === 'erratic' || g.kind === 'shy' ) {
@@ -246,12 +265,15 @@ function moveGhost( game, g ) {
   }
 
   const d = DIRS[ g.dir ];
-  g.x += d.x * g.speed;
-  g.y += d.y * g.speed;
+  const speed = ( game.frightTimer > 0 && g.mode === 'outside' ) ? FRIGHT_SPEED : g.speed;
+  g.x += d.x * speed;
+  g.y += d.y * speed;
   wrapTunnel( g, width );
 }
 
 function resetPositions( game ) {
+  game.frightTimer = 0;
+  game.ghostChain = 0;
   const p = game.pacman;
   p.x = PACMAN_START.x;
   p.y = PACMAN_START.y;
@@ -271,11 +293,27 @@ function collides( a, b ) {
 }
 
 function update( game ) {
+  if ( game.frightTimer > 0 ) game.frightTimer--;
   movePacman( game );
   game.ghosts.forEach( ( g ) => moveGhost( game, g ) );
 
-  for ( const g of game.ghosts ) {
+  for ( let i = 0; i < game.ghosts.length; i++ ) {
+    const g = game.ghosts[ i ];
     if ( collides( game.pacman, g ) ) {
+      if ( game.frightTimer > 0 ) {
+        if ( g.mode === 'outside' || g.mode === 'leaving' ) {
+          game.score += Math.min( 200 << game.ghostChain, 1600 );
+          game.ghostChain++;
+          g.mode = 'pen';
+          g.exitTimer = 120;
+          g.x = GHOST_STARTS[ i ].x;
+          g.y = GHOST_STARTS[ i ].y;
+          g.dir = 'up';
+          continue;
+        }
+        // Fantasma en el corral: no comestible ni letal durante frightened.
+        if ( g.mode === 'pen' ) continue;
+      }
       game.lives--;
       if ( game.lives <= 0 ) {
         game.state = 'lost';

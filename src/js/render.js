@@ -66,14 +66,22 @@ function drawDoor( ctx, grid ) {
   ctx.stroke();
 }
 
-function drawDots( ctx, grid ) {
+function drawDots( ctx, grid, frame ) {
   ctx.fillStyle = DOT_COLOR;
+  const f = frame || 0;
   for ( let y = 0; y < grid.length; y++ ) {
     for ( let x = 0; x < grid[ 0 ].length; x++ ) {
-      if ( grid[ y ][ x ] !== 2 ) continue;
+      const v = grid[ y ][ x ];
+      if ( v !== 2 && v !== 4 ) continue;
       const { cx, cy } = cellCenter( x, y );
       ctx.beginPath();
-      ctx.arc( cx, cy, 2.5, 0, Math.PI * 2 );
+      if ( v === 2 ) {
+        ctx.arc( cx, cy, 2.5, 0, Math.PI * 2 );
+      } else {
+        // Pellet grande con parpadeo (pulso siempre visible).
+        const r = 5.5 + Math.sin( f * 0.15 ) * 0.8;
+        ctx.arc( cx, cy, r, 0, Math.PI * 2 );
+      }
       ctx.fill();
     }
   }
@@ -152,6 +160,9 @@ const GHOST_COLORS_BY_KIND = {
   shy: '#ffb852',
 };
 const GHOST_COLORS_FALLBACK = [ '#ff0000', '#00ffff', '#ffb8ff', '#ffb852' ];
+const FRIGHT_COLOR = '#2121de';
+const FRIGHT_FLASH = '#ffffff';
+const FRIGHT_WARNING_FRAMES = 120;
 
 function draw( ctx, game, frame ) {
   const grid = game.grid;
@@ -163,10 +174,19 @@ function draw( ctx, game, frame ) {
 
   drawWalls( ctx, grid );
   drawDoor( ctx, grid );
-  drawDots( ctx, grid );
+  drawDots( ctx, grid, frame );
   drawPacman( ctx, game.pacman, frame );
-  game.ghosts.forEach( ( g, i ) =>
-    drawGhost( ctx, g, GHOST_COLORS_BY_KIND[ g.kind ] || GHOST_COLORS_FALLBACK[ i ] || '#ff0000' ) );
+  game.ghosts.forEach( ( g, i ) => {
+    let color = GHOST_COLORS_BY_KIND[ g.kind ] || GHOST_COLORS_FALLBACK[ i ] || '#ff0000';
+    if ( game.frightTimer > 0 ) {
+      if ( game.frightTimer < FRIGHT_WARNING_FRAMES ) {
+        color = Math.floor( frame / 10 ) % 2 === 0 ? FRIGHT_FLASH : FRIGHT_COLOR;
+      } else {
+        color = FRIGHT_COLOR;
+      }
+    }
+    drawGhost( ctx, g, color );
+  } );
   drawHUD( ctx, game, W );
 }
 
